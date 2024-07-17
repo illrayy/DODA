@@ -156,13 +156,13 @@ def get_layout_image(img, laBel):
         box_img_lay_2 = np.zeros((h, w, 1), dtype=np.uint8)
         box_img_lay_3 = np.zeros((h, w, 1), dtype=np.uint8)
 
-        if box_lay_1.shape[0] > 1:
+        if box_lay_1.shape[0] > 0:
             for bbox in box_lay_1:
                 cv2.rectangle(box_img_lay_1, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255), -1)
-        if box_lay_2.shape[0] > 1:
+        if box_lay_2.shape[0] > 0:
             for bbox in box_lay_2:
                 cv2.rectangle(box_img_lay_2, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255), -1)
-        if box_lay_3.shape[0] > 1:
+        if box_lay_3.shape[0] > 0:
             for bbox in box_lay_3:
                 if bbox not in box_lay_2:
                     cv2.rectangle(box_img_lay_3, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255), -1)        
