@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from utils.utils import read_label, makedir, get_layout_image
+from utils.utils import read_label, get_layout_image
 
 #Path of Global Wheat Head Detection Dataset
 gwhd_2021_path = 'datasets/gwhd_2021/'
@@ -13,15 +13,15 @@ gwhd_2021_path = 'datasets/gwhd_2021/'
 
 #Path to save the images of Terraref domain
 Terraref_path = 'datasets/gwhd_2021/Terraref/target/'
-makedir(Terraref_path)
+os.makedirs(Terraref_path, exist_ok=True)
 Terraref_ori_source_path = 'datasets/gwhd_2021/Terraref/source/'
-makedir(Terraref_ori_source_path)
+os.makedirs(Terraref_ori_source_path, exist_ok=True)
 Terraref_cut_Path = 'datasets/gwhd_2021/Terraref_x9/'
-makedir(Terraref_cut_Path)
+os.makedirs(Terraref_cut_Path, exist_ok=True)
 Terraref_source_Path = Terraref_cut_Path + 'source/'
-makedir(Terraref_source_Path)
+os.makedirs(Terraref_source_Path, exist_ok=True)
 Terraref_target_Path = Terraref_cut_Path + 'target/'
-makedir(Terraref_target_Path)
+os.makedirs(Terraref_target_Path, exist_ok=True)
 
 
 gwhd_2021_img_path = gwhd_2021_path + 'images/'
@@ -98,7 +98,5 @@ for imgName in tqdm(os.listdir(Terraref_path)):
                     names_img_wo_wheat.write('%s.png'%(imgName + '_' + str(i)) + '\n')
 
                 Terraref_label.write('\n')
-
-                
 
                 i += 1

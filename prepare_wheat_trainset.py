@@ -3,7 +3,7 @@ import os
 import random
 from tqdm import tqdm
 
-from utils.utils import read_label, makedir, get_layout_image
+from utils.utils import read_label, get_layout_image
 
 random.seed(23)
 
@@ -18,9 +18,9 @@ gwhd_2021_img_path = gwhd_2021_path + 'images/'
 csvFiles = gwhd_2021_path + 'competition_train.csv'
 
 target_path = save_path + 'target/'
-makedir(target_path)
+os.makedirs(target_path, exist_ok=True)
 source_path = save_path + 'source/'
-makedir(source_path)
+os.makedirs(source_path, exist_ok=True)
 
 ldm_train_ids = open(save_path + 'train_ldm.txt', 'w', encoding='utf-8')
 ldm_val_ids = open(save_path + 'val_ldm.txt', 'w', encoding='utf-8')
