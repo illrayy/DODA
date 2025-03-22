@@ -290,8 +290,6 @@ class ControlNet(nn.Module):
         outs = []
 
         h = x.type(self.dtype)
-
-
         for module, zero_conv in zip(self.input_blocks, self.zero_convs):
             if guided_hint is not None:
                 h = module(h, emb, context)
@@ -314,7 +312,7 @@ class ControlLDM(LatentDiffusion):
         self.control_model = instantiate_from_config(control_stage_config)
         self.control_key = control_key
         self.only_mid_control = only_mid_control
-        self.control_scales = [1.0] * 10
+        self.control_scales = [1.0] * 13
 
     @torch.no_grad()
     def get_input(self, batch, k, bs=None, *args, **kwargs):
@@ -333,7 +331,7 @@ class ControlLDM(LatentDiffusion):
 
         cond_txt = torch.cat(cond['c_crossattn'], 1)
 
-        if cond['c_concat'] is None:
+        if cond['c_concat'] is None or self.control_scales is None:
             eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
         else:
             control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
