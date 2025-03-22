@@ -1,6 +1,5 @@
 import os
 
-
 import cv2
 import random
 import einops
@@ -9,9 +8,8 @@ import torch
 
 from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
-from cldm.ddim_hacked import DDIMSampler
-from utils.utils import makedir
-from transformers import AutoImageProcessor
+from DODA.sampler import eulerSampler
+from transformers import CLIPImageProcessor
 
 
 
@@ -31,7 +29,11 @@ names_img_with_wheat = "datasets/gwhd_2021/Terraref_x9/with_wheat.txt"
 names_img_wo_wheat = "datasets/gwhd_2021/Terraref_x9/wo_wheat.txt"
 
 
-n_img = 800   # The number of images that need to be generated
+strength = 1
+cfg_scale = 1
+sample_step = 50
+
+n_img = 200   # The number of images that need to be generated
 seed = 21
 batch_size = 8
 img_resolution = 512
@@ -46,7 +48,7 @@ seed_everything(seed)
 
 
             
-def process(control, reference_img, ddim_steps=50, guess_mode=False, strength=1.75, scale=1, eta=0.0):
+def process(control, reference_img, scale=1):
     with torch.no_grad():
         
         B, H, W, C = control.shape
@@ -55,17 +57,15 @@ def process(control, reference_img, ddim_steps=50, guess_mode=False, strength=1.
         control = einops.rearrange(control, 'b h w c -> b c h w').clone()
         
         reference = torch.from_numpy(reference_img.copy()).float().cuda()
+        c_crossattn = [model.get_learned_conditioning(reference)]
 
 
-        cond = {"c_concat": [control], "c_crossattn": [model.get_learned_conditioning(reference)]}
-        un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [model.get_learned_conditioning(torch.zeros((B, 3, 224, 224)).cuda())]}
-        shape = (3, H // 4, W // 4)
+        cond = {"c_concat": [control], "c_crossattn": [c_crossattn]}
+        un_cond = {"c_concat": [torch.zeros_like(control).cuda()], "c_crossattn": [c_crossattn]}
+        shape = (B, 3, H // 4, W // 4)
 
-        model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
-        samples, intermediates = ddim_sampler.sample(ddim_steps, B,
-                                                     shape, cond, verbose=False, eta=eta,
-                                                     unconditional_guidance_scale=scale,
-                                                     unconditional_conditioning=un_cond)
+        samples = sampler.sample_heun(shape=shape, c=cond, 
+                                 unconditional_guidance_scale=scale, unconditional_conditioning=un_cond)
 
         x_samples = model.decode_first_stage(samples)
         x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
@@ -82,12 +82,18 @@ output_ctr_path = output_path + 'ctr/'
 
 model = create_model(configs).cpu()
 model.load_state_dict(load_state_dict(weight, location='cuda'))
-model = model.cuda()
-ddim_sampler = DDIMSampler(model)
-img_processor = AutoImageProcessor.from_pretrained("facebook/vit-mae-base")
 
-makedir(output_img_path)
-makedir(output_ctr_path)
+if strength==0:
+    model.control_scales = None
+    model.control_model = None
+else:
+    model.control_scales = ([strength] * 13)
+model = model.cuda()
+sampler = eulerSampler(model, sample_step)
+img_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-base-patch16")
+
+os.makedirs(output_img_path, exist_ok=True)
+os.makedirs(output_ctr_path, exist_ok=True)
 
 
 

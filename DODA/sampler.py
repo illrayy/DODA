@@ -86,13 +86,9 @@ class eulerSampler(object):
                 x = x + eps * (sigma_hat ** 2 - self.step_sigma[i] ** 2) ** 0.5
 
             ts = torch.round(self.timesteps[i])
-            #ts = self.sigma_to_t(sigma_hat)
             ts = torch.full((shape[0],), ts, device=self.device, dtype=torch.long)
             c_in = 1 / (sigma_hat ** 2 + 1) ** 0.5
             if unconditional_conditioning is None or unconditional_guidance_scale==1.:
-                '''model_output = self.model.apply_model(x*c_in, ts, c)
-                pred_original_sample = x - sigma_hat * model_output
-                d = (x - pred_original_sample) / sigma_hat'''
                 d = self.model.apply_model(x*c_in, ts, c)
             else:
                 d = self.model.apply_model(x*c_in, ts, c)
@@ -102,123 +98,4 @@ class eulerSampler(object):
             # Euler method
             x = x + d * dt
 
-        return x
-
-    def sample_heun(self, shape, c, x=None, disable=None, s_churn=0., s_tmin=0., s_tmax=float('inf'), s_noise=1., unconditional_guidance_scale=1., unconditional_conditioning=None):
-        """Implements Algorithm 2 (Heun steps) from Karras et al. (2022)."""
-
-        if x is None:
-            x = torch.randn(shape, device=self.device)
-        x = x*self.step_sigma[0]
-
-        print(f'Data shape for heun sampling is {shape}')
-        for i in trange(len(self.step_sigma) - 1, disable=disable):
-            gamma = min(s_churn / (len(self.step_sigma) - 1), 2 ** 0.5 - 1) if s_tmin <= self.step_sigma[i] <= s_tmax else 0.
-            eps = torch.randn_like(x) * s_noise
-            sigma_hat = self.step_sigma[i] * (gamma + 1)
-            if gamma > 0:
-                x = x + eps * (sigma_hat ** 2 - self.step_sigma[i] ** 2) ** 0.5
-
-            ts = torch.round(self.timesteps[i])
-            #ts = self.sigma_to_t(sigma_hat)
-            ts = torch.full((shape[0],), ts, device=self.device, dtype=torch.long)
-
-            c_in = 1 / (sigma_hat ** 2 + 1) ** 0.5
-            if unconditional_conditioning is None or unconditional_guidance_scale==1.:
-                d = self.model.apply_model(x*c_in, ts, c)
-            else:
-                d = self.model.apply_model(x*c_in, ts, c)
-                un_d = self.model.apply_model(x*c_in, ts, unconditional_conditioning)
-                d = un_d + unconditional_guidance_scale * (d - un_d)
-
-            dt = self.step_sigma[i + 1] - sigma_hat
-            if self.step_sigma[i + 1] == 0:
-                # Euler method
-                x = x + d * dt
-            else:
-                # Heun's method
-                x_2 = x + d * dt
-
-                '''ts = torch.round(self.timesteps[i+1])
-                #ts = self.sigma_to_t(self.step_sigma[i+1])
-                ts = torch.full((shape[0],), ts, device=self.device, dtype=torch.long)'''
-
-                c_in = 1 / (self.step_sigma[i+1] ** 2 + 1) ** 0.5
-                if unconditional_conditioning is None or unconditional_guidance_scale==1.:
-                    d_2 = self.model.apply_model(x_2*c_in, ts, c)
-                else:
-                    d_2 = self.model.apply_model(x_2*c_in, ts, c)
-                    un_d_2 = self.model.apply_model(x_2*c_in, ts, unconditional_conditioning)
-                    d_2 = un_d_2 + unconditional_guidance_scale * (d_2 - un_d_2)
-
-                d_prime = (d + d_2) / 2
-                x = x + d_prime * dt
-        return x
-
-    def sample_edm(self, shape, c, x=None, disable=None, s_churn=0., s_tmin=0., s_tmax=float('inf'), s_noise=1., unconditional_guidance_scale=1., unconditional_conditioning=None):
-        """Implements Algorithm 2 (edm steps) from Karras et al. (2022)."""
-
-        if x is None:
-            x = torch.randn(shape, device=self.device)
-        x = x*self.step_sigma[0]
-
-        print(f'Data shape for edm sampling is {shape}')
-        for i in trange(len(self.step_sigma) - 1, disable=disable):
-            gamma = min(s_churn / (len(self.step_sigma) - 1), 2 ** 0.5 - 1) if s_tmin <= self.step_sigma[i] <= s_tmax else 0.
-
-            eps = torch.randn_like(x) * s_noise
-            sigma_hat = self.step_sigma[i] * (gamma + 1)
-            if gamma > 0:
-                x = x + eps * (sigma_hat ** 2 - self.step_sigma[i] ** 2) ** 0.5
-
-
-
-            c_skip = self.sigma_data ** 2 / (sigma_hat ** 2 + self.sigma_data ** 2)
-            c_out = sigma_hat * self.sigma_data / (sigma_hat ** 2 + self.sigma_data ** 2).sqrt()
-            c_in = 1 / (self.sigma_data ** 2 + sigma_hat ** 2).sqrt()
-            c_noise = sigma_hat.log() / 4
-
-
-            #ts = torch.round(self.timesteps[i])
-            ts = self.sigma_to_t(sigma_hat)
-            ts = torch.full((shape[0],), ts, device=self.device, dtype=torch.long)
-
-
-            if unconditional_conditioning is None or unconditional_guidance_scale==1.:
-                d = self.model.apply_model(x*c_in, ts, c)
-
-
-            else:
-                d = self.model.apply_model(x*c_in, ts, c)
-                un_d = self.model.apply_model(x*c_in, ts, unconditional_conditioning)
-                d = un_d + unconditional_guidance_scale * (d - un_d)
-
-            dt = self.step_sigma[i + 1] - sigma_hat
-            #if self.step_sigma[i + 1] == 0:
-            if True:
-                # Euler method
-                x = x + d * dt
-            else:
-                # Heun's method
-                sigma_next = self.step_sigma[i+1]
-                x_2 = x + d * dt
-
-                #ts = torch.round(self.timesteps[i+1])
-                ts = self.sigma_to_t(sigma_next)
-                ts = torch.full((shape[0],), ts, device=self.device, dtype=torch.long)
-                c_skip = self.sigma_data ** 2 / (sigma_next ** 2 + self.sigma_data ** 2)
-                c_out = sigma_next * self.sigma_data / (sigma_next ** 2 + self.sigma_data ** 2).sqrt()
-                c_in = 1 / (self.sigma_data ** 2 + sigma_next ** 2).sqrt()
-
-                if unconditional_conditioning is None or unconditional_guidance_scale==1.:
-                    e_2 = self.model.apply_model(x_2*c_in, ts, c)
-                    denoised_2 = c_skip * x_2 + c_out * e_2
-                    d_2 = (x_2 - denoised_2)/sigma_next
-                else:
-                    d_2 = self.model.apply_model(x_2*c_in, ts, c)
-                    un_d_2 = self.model.apply_model(x_2*c_in, ts, unconditional_conditioning)
-                    d_2 = un_d_2 + unconditional_guidance_scale * (d_2 - un_d_2)
-
-                d_prime = (d + d_2) / 2
-                x = x + d_prime * dt
         return x
